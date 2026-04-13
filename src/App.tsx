@@ -60,6 +60,7 @@ const hiraganaRows: KanaRow[] = [
   { label: '야행', hint: 'ya', cells: [kanaCell('や', 'ya'), emptyKanaCell, kanaCell('ゆ', 'yu'), emptyKanaCell, kanaCell('よ', 'yo')] },
   { label: '라행', hint: 'ra', cells: [kanaCell('ら', 'ra'), kanaCell('り', 'ri'), kanaCell('る', 'ru'), kanaCell('れ', 're'), kanaCell('ろ', 'ro')] },
   { label: '와행', hint: 'wa', cells: [kanaCell('わ', 'wa'), emptyKanaCell, emptyKanaCell, emptyKanaCell, kanaCell('を', 'o')] },
+  { label: 'ん', hint: 'n', cells: [kanaCell('ん', 'n'), emptyKanaCell, emptyKanaCell, emptyKanaCell, emptyKanaCell] },
 ]
 
 const katakanaRows: KanaRow[] = [
@@ -73,6 +74,7 @@ const katakanaRows: KanaRow[] = [
   { label: '야행', hint: 'ya', cells: [kanaCell('ヤ', 'ya'), emptyKanaCell, kanaCell('ユ', 'yu'), emptyKanaCell, kanaCell('ヨ', 'yo')] },
   { label: '라행', hint: 'ra', cells: [kanaCell('ラ', 'ra'), kanaCell('リ', 'ri'), kanaCell('ル', 'ru'), kanaCell('レ', 're'), kanaCell('ロ', 'ro')] },
   { label: '와행', hint: 'wa', cells: [kanaCell('ワ', 'wa'), emptyKanaCell, emptyKanaCell, emptyKanaCell, kanaCell('ヲ', 'o')] },
+  { label: 'ン', hint: 'n', cells: [kanaCell('ン', 'n'), emptyKanaCell, emptyKanaCell, emptyKanaCell, emptyKanaCell] },
 ]
 
 const starterSupportLessonCount = 20
@@ -1850,7 +1852,7 @@ function KanaWorkbench({ target, onReplay }: { target: KanaTarget; onReplay: () 
           <div className="kana-writing-head">
             <div>
               <strong>직접 써보기</strong>
-              <p>PC는 마우스, 모바일은 터치로 흐린 글자 위에 그대로 따라 써보면 됩니다.</p>
+              <p>PC는 마우스, 모바일은 터치로 따라 쓸 수 있고, 헷갈리면 아래에서 획순 애니메이션도 바로 볼 수 있습니다.</p>
             </div>
             <span className="section-hint">모양 감각 익히기</span>
           </div>

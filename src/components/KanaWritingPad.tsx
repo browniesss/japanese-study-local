@@ -19,6 +19,10 @@ export function KanaWritingPad({ target }: KanaWritingPadProps) {
   const activeStrokeRef = useRef<Stroke | null>(null)
   const strokesRef = useRef<Stroke[]>([])
   const [strokeCount, setStrokeCount] = useState(0)
+  const [mode, setMode] = useState<'write' | 'stroke-order'>('write')
+  const [strokeReplayKey, setStrokeReplayKey] = useState(0)
+  const codePoint = target.codePointAt(0) ?? 0
+  const strokeOrderSource = `/kana-strokes/${codePoint}.svg`
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -100,25 +104,79 @@ export function KanaWritingPad({ target }: KanaWritingPadProps) {
 
   return (
     <div className="kana-pad-shell">
-      <div className="kana-pad-surface">
-        <div className="kana-pad-guide" aria-hidden="true">
-          <span>{target}</span>
-        </div>
-        <canvas
-          ref={canvasRef}
-          className="kana-pad-canvas"
-          onPointerDown={handlePointerDown}
-          onPointerMove={handlePointerMove}
-          onPointerUp={finishStroke}
-          onPointerCancel={finishStroke}
-          onPointerLeave={finishStroke}
-        />
+      <div className={`kana-pad-surface ${mode === 'stroke-order' ? 'kana-pad-surface-stroke-order' : ''}`}>
+        {mode === 'write' ? (
+          <>
+            <div className="kana-pad-guide" aria-hidden="true">
+              <span>{target}</span>
+            </div>
+            <canvas
+              ref={canvasRef}
+              className="kana-pad-canvas"
+              onPointerDown={handlePointerDown}
+              onPointerMove={handlePointerMove}
+              onPointerUp={finishStroke}
+              onPointerCancel={finishStroke}
+              onPointerLeave={finishStroke}
+            />
+          </>
+        ) : (
+          <div className="kana-stroke-order-shell">
+            <div className="kana-stroke-order-head">
+              <span className="course-label">획순 애니메이션</span>
+              <strong>{target}</strong>
+            </div>
+            <object
+              key={`${target}-${strokeReplayKey}`}
+              className="kana-stroke-order-object"
+              data={strokeOrderSource}
+              type="image/svg+xml"
+              aria-label={`${target} 획순 애니메이션`}
+            >
+              <div className="kana-stroke-order-fallback">
+                <strong>획순 자료를 불러오지 못했습니다</strong>
+                <p>정적 파일이 아직 배포되지 않았거나 네트워크 상태가 좋지 않습니다.</p>
+              </div>
+            </object>
+          </div>
+        )}
       </div>
       <div className="kana-pad-actions">
-        <span className="section-hint">{strokeCount ? `${strokeCount}번 그렸습니다` : '흐린 글자 위에 그대로 써보며 모양을 익혀 보세요.'}</span>
-        <button className="ghost-button" type="button" onClick={clearPad}>
-          지우기
-        </button>
+        <span className="section-hint">
+          {mode === 'write'
+            ? strokeCount
+              ? `${strokeCount}번 그렸습니다. 헷갈리면 획순 보기로 순서를 먼저 확인해 보세요.`
+              : '흐린 글자 위에 따라 쓰거나, 먼저 획순 보기로 쓰는 순서를 익혀 보세요.'
+            : '애니메이션을 본 뒤 직접 써보기로 돌아가 같은 순서로 따라 써보면 더 잘 익습니다.'}
+        </span>
+        <div className="kana-pad-action-group">
+          <button
+            className={`ghost-button ${mode === 'write' ? 'ghost-button-active' : ''}`}
+            type="button"
+            onClick={() => setMode('write')}
+          >
+            직접 써보기
+          </button>
+          <button
+            className={`ghost-button ${mode === 'stroke-order' ? 'ghost-button-active' : ''}`}
+            type="button"
+            onClick={() => {
+              setMode('stroke-order')
+              setStrokeReplayKey((current) => current + 1)
+            }}
+          >
+            획순 보기
+          </button>
+          {mode === 'write' ? (
+            <button className="ghost-button" type="button" onClick={clearPad}>
+              지우기
+            </button>
+          ) : (
+            <button className="ghost-button" type="button" onClick={() => setStrokeReplayKey((current) => current + 1)}>
+              다시 재생
+            </button>
+          )}
+        </div>
       </div>
     </div>
   )
