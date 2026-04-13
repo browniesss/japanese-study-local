@@ -95,6 +95,9 @@ button {
   display: grid;
   place-items: center;
   padding: 24px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
 }
 
 .welcome-modal {
@@ -106,6 +109,10 @@ button {
   padding: 32px;
   display: grid;
   gap: 20px;
+  max-height: calc(100dvh - 48px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
 }
 
 .sidebar {
@@ -2637,6 +2644,12 @@ input[type='range'] {
 
   .welcome-modal {
     padding: 24px;
+    max-height: calc(100dvh - 32px);
+  }
+
+  .welcome-overlay {
+    place-items: start center;
+    padding: 16px;
   }
 
   .dashboard-reward-strip,
