@@ -1,0 +1,44 @@
+{
+  "version": 1,
+  "generatedAt": "2026-04-13T08:43:29.644Z",
+  "lessonCount": 1200,
+  "unitCount": 160,
+  "courses": [
+    {
+      "id": "starter",
+      "label": "입문자",
+      "title": "문자와 첫 표현 코스",
+      "summary": "히라가나부터 천천히 시작해 짧은 인사와 자기소개까지 가는 가장 쉬운 과정입니다.",
+      "audience": "히라가나를 전혀 모르는 사람",
+      "lessonCount": 300,
+      "file": "/content/courses/starter.json"
+    },
+    {
+      "id": "beginner",
+      "label": "초보자",
+      "title": "기초 문장과 일상 표현 코스",
+      "summary": "기본 문장 구조, 질문, 주문, 취미, 일정 같은 생활 표현을 익히는 단계입니다.",
+      "audience": "문자는 읽을 수 있지만 문장을 아직 잘 못 만드는 사람",
+      "lessonCount": 300,
+      "file": "/content/courses/beginner.json"
+    },
+    {
+      "id": "intermediate",
+      "label": "중급자",
+      "title": "업무 대화와 설명 코스",
+      "summary": "이유, 비교, 일정, 회의, 진행 상황 공유처럼 실제 협업에 가까운 표현을 다룹니다.",
+      "audience": "기초 회화는 가능하지만 더 자연스러운 설명이 필요한 사람",
+      "lessonCount": 300,
+      "file": "/content/courses/intermediate.json"
+    },
+    {
+      "id": "advanced",
+      "label": "숙련자",
+      "title": "비즈니스 톤과 고급 표현 코스",
+      "summary": "완곡 표현, 회의 진행, 보고, 조율, 이메일 문구 같은 고급 업무 표현을 다룹니다.",
+      "audience": "업무 맥락에서 더 정교한 일본어 톤이 필요한 사람",
+      "lessonCount": 300,
+      "file": "/content/courses/advanced.json"
+    }
+  ]
+}

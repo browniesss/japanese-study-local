@@ -1,0 +1,57 @@
+#cloud-config
+package_update: true
+package_upgrade: true
+
+write_files:
+  - path: /usr/local/bin/bootstrap-japanese-study.sh
+    permissions: "0755"
+    content: |
+      #!/bin/bash
+      set -euxo pipefail
+
+      APP_DIR=/opt/japanese-study/app
+      APP_USER=opc
+      APP_GIT_URL="__APP_GIT_URL__"
+      APP_GIT_REF="__APP_GIT_REF__"
+
+      dnf install -y git tar
+      curl -fsSL https://rpm.nodesource.com/setup_22.x | bash -
+      dnf install -y nodejs
+
+      mkdir -p /opt/japanese-study
+      rm -rf "$APP_DIR"
+      git clone --depth 1 --branch "$APP_GIT_REF" "$APP_GIT_URL" "$APP_DIR"
+
+      cd "$APP_DIR"
+      npm ci
+      npm run build
+
+      mkdir -p "$APP_DIR/var"
+      chown -R "$APP_USER":"$APP_USER" /opt/japanese-study
+
+      cat >/etc/systemd/system/japanese-study.service <<'EOF'
+      [Unit]
+      Description=Japanese Study App
+      After=network.target
+
+      [Service]
+      Type=simple
+      User=opc
+      WorkingDirectory=/opt/japanese-study/app
+      Environment=HOST=0.0.0.0
+      Environment=PORT=80
+      Environment=DATA_DIR=/opt/japanese-study/app/var
+      ExecStart=/usr/bin/node server/app.mjs
+      Restart=always
+      RestartSec=5
+
+      [Install]
+      WantedBy=multi-user.target
+      EOF
+
+      systemctl daemon-reload
+      systemctl enable japanese-study.service
+      systemctl restart japanese-study.service
+
+runcmd:
+  - /usr/local/bin/bootstrap-japanese-study.sh

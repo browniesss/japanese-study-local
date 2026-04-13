@@ -1,0 +1,37 @@
+{
+  "name": "japanese-study-local",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "npm run content:sync && vite --host",
+    "build": "npm run content:sync && tsc -b && vite build",
+    "lint": "eslint .",
+    "preview": "vite preview",
+    "start:server": "node server/app.mjs",
+    "start:oracle": "npm run build && node server/app.mjs",
+    "content:check": "node scripts/content-check.mjs",
+    "content:bootstrap": "node scripts/bootstrap-content-from-legacy.mjs",
+    "content:sync": "node scripts/sync-content.mjs",
+    "audio:starter": "python scripts/generate_starter_audio.py"
+  },
+  "dependencies": {
+    "postgres": "^3.4.7",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.4",
+    "@types/node": "^24.12.2",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.1",
+    "eslint": "^9.39.4",
+    "eslint-plugin-react-hooks": "^7.0.1",
+    "eslint-plugin-react-refresh": "^0.5.2",
+    "globals": "^17.4.0",
+    "typescript": "~6.0.2",
+    "typescript-eslint": "^8.58.0",
+    "vite": "^8.0.4"
+  }
+}
