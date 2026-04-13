@@ -304,7 +304,7 @@ function StudyApp({ content }: { content: ContentBundle }) {
   const selectedCourse = courseCatalog.find((course) => course.id === selectedCourseId) ?? courseCatalog[0]
   const guidedMode = selectedCourse.id === 'starter' && courseCompletionCounts.starter < 12
   const activeNavigationItems = guidedMode
-    ? navigationItems.filter((item) => ['dashboard', 'lesson', 'charts'].includes(item.key))
+    ? navigationItems.filter((item) => ['dashboard', 'lesson', 'charts', 'settings'].includes(item.key))
     : navigationItems
   const mobilePrimaryNavigation = guidedMode
     ? activeNavigationItems
