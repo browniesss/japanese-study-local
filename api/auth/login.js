@@ -1,5 +1,5 @@
-import { createSession, createSessionCookie, ensureSessionSchema, normalizeNickname, parseStoredProgress, upsertUserByNickname } from './_lib/auth.js'
-import { empty, json, readJson } from './_lib/http.js'
+import { createSession, createSessionCookie, ensureSessionSchema, normalizeNickname, parseStoredProgress, upsertUserByNickname } from '../_lib/auth.js'
+import { empty, json, readJson } from '../_lib/http.js'
 
 export function OPTIONS() {
   return empty()
@@ -15,17 +15,18 @@ export async function POST(request) {
     }
 
     await ensureSessionSchema()
+
     const user = await upsertUserByNickname(nickname)
     if (!user) {
-      return json({ error: 'bootstrap_failed' }, { status: 500 })
+      return json({ error: 'login_failed' }, { status: 500 })
     }
 
     const sessionToken = await createSession(user.id)
 
     return json(
       {
+        authenticated: true,
         nickname: user.nickname_display,
-        deviceToken: '',
         progress: parseStoredProgress(user),
       },
       {
@@ -37,7 +38,7 @@ export async function POST(request) {
   } catch (error) {
     return json(
       {
-        error: error instanceof Error ? error.message : 'bootstrap_failed',
+        error: error instanceof Error ? error.message : 'login_failed',
       },
       { status: 500 },
     )

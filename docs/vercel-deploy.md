@@ -5,6 +5,7 @@
 - 프론트엔드: Vite 정적 배포
 - API: `api/*.js` Vercel Functions
 - 진행 저장: 외부 Postgres (`DATABASE_URL`)
+- 로그인: 닉네임 + 세션 쿠키
 
 ## 필요한 것
 
@@ -20,8 +21,14 @@
   - DB 연결 가능 여부 확인
 - `/api/bootstrap`
   - 닉네임 + 내부 device token 기준으로 학습 프로필 생성/복구
+- `/api/auth/login`
+  - 닉네임으로 로그인하고 세션 쿠키 발급
+- `/api/auth/me`
+  - 현재 세션 사용자와 진행도 확인
+- `/api/auth/logout`
+  - 현재 세션 종료
 - `/api/progress`
-  - 학습 진행 조회/저장
+  - 현재 로그인 사용자 학습 진행 조회/저장
 
 ## 첫 배포
 
@@ -49,3 +56,4 @@ DATABASE_URL=postgres://...
 
 - DB 테이블은 첫 API 호출 때 자동 생성된다.
 - `DATABASE_URL`이 없으면 앱은 원격 저장을 비활성화하고 로컬 저장으로만 동작한다.
+- 원격 저장이 켜지면 같은 브라우저에서는 세션 쿠키로 자동 로그인된다.

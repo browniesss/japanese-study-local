@@ -1,4 +1,4 @@
-import { loadProgressRow, normalizeNickname, parseStoredProgress, saveProgress } from './_lib/progress.js'
+import { ensureSessionSchema, getSessionUser, parseStoredProgress, saveUserProgress } from './_lib/auth.js'
 import { empty, json, readJson } from './_lib/http.js'
 
 export function OPTIONS() {
@@ -7,18 +7,17 @@ export function OPTIONS() {
 
 export async function GET(request) {
   try {
-    const url = new URL(request.url)
-    const deviceToken = url.searchParams.get('deviceToken') ?? ''
-    const row = await loadProgressRow(deviceToken)
+    await ensureSessionSchema()
+    const user = await getSessionUser(request)
 
-    if (!row) {
-      return json({ error: 'not_found' }, { status: 404 })
+    if (!user) {
+      return json({ error: 'unauthorized' }, { status: 401 })
     }
 
     return json({
-      nickname: row.nickname,
-      progress: parseStoredProgress(row),
-      updatedAt: row.updated_at instanceof Date ? row.updated_at.toISOString() : new Date(row.updated_at).toISOString(),
+      nickname: user.nickname_display,
+      progress: parseStoredProgress(user),
+      updatedAt: new Date().toISOString(),
     })
   } catch (error) {
     return json(
@@ -33,15 +32,19 @@ export async function GET(request) {
 export async function POST(request) {
   try {
     const body = await readJson(request)
-    const deviceToken = typeof body?.deviceToken === 'string' ? body.deviceToken : ''
-    const nickname = normalizeNickname(body?.nickname)
     const progress = body?.progress
+    await ensureSessionSchema()
+    const user = await getSessionUser(request)
 
-    if (!deviceToken || !nickname || !progress || typeof progress !== 'object') {
+    if (!user) {
+      return json({ error: 'unauthorized' }, { status: 401 })
+    }
+
+    if (!progress || typeof progress !== 'object') {
       return json({ error: 'invalid_payload' }, { status: 400 })
     }
 
-    await saveProgress(deviceToken, nickname, progress)
+    await saveUserProgress(user.id, progress)
 
     return json({
       ok: true,

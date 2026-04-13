@@ -14,6 +14,7 @@ export async function GET() {
     return json({
       ok: true,
       storage: 'postgres',
+      auth: 'nickname-session',
     })
   } catch (error) {
     return json(

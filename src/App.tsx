@@ -16,12 +16,11 @@ import {
 import { loadContentBundle } from './lib/content'
 import { localProgressStore } from './lib/progressStore'
 import {
-  bootstrapRemoteProfile,
   detectRemoteProgressApi,
-  getStoredDeviceToken,
-  loadRemoteProgress,
+  loadRemoteSession,
+  loginRemoteProfile,
+  logoutRemoteProfile,
   saveRemoteProgress,
-  setStoredDeviceToken,
 } from './lib/remoteProgress'
 import type { ChoiceStep, ContentBundle, Course, Lesson, ProgressState, ReviewItem, Step } from './types'
 
@@ -162,19 +161,19 @@ function StudyApp({ content }: { content: ContentBundle }) {
   const [syncReady, setSyncReady] = useState(false)
   const [syncBusy, setSyncBusy] = useState(false)
   const [syncStatus, setSyncStatus] = useState('저장 방식을 확인하는 중입니다.')
-  const [deviceToken, setDeviceToken] = useState<string | null>(null)
+  const [remoteAuthenticated, setRemoteAuthenticated] = useState(false)
+  const [accountNickname, setAccountNickname] = useState('')
   const saveTimerRef = useRef<number | null>(null)
 
   useEffect(() => {
     let cancelled = false
-    const token = getStoredDeviceToken()
-    setDeviceToken(token)
 
     detectRemoteProgressApi()
       .then(async (available) => {
         if (cancelled) return
 
         if (!available) {
+          setRemoteAuthenticated(false)
           setSyncMode('local')
           setSyncStatus('현재는 이 브라우저에만 저장됩니다.')
           setSyncReady(true)
@@ -182,26 +181,48 @@ function StudyApp({ content }: { content: ContentBundle }) {
         }
 
         setSyncMode('remote')
-        setSyncStatus('외부 저장소와 연결 중입니다.')
-
-        if (!token) {
-          setSyncStatus('닉네임을 입력하면 외부 저장소와 연결됩니다.')
-          setSyncReady(true)
-          return
-        }
+        setSyncStatus('로그인 상태를 확인하는 중입니다.')
 
         try {
-          const remote = await loadRemoteProgress(token)
+          const session = await loadRemoteSession()
           if (cancelled) return
 
-          if (remote.progress) {
-            setProgress(sanitizeProgress({ ...remote.progress, nickname: remote.nickname }, courseCatalog))
+          if (!session) {
+            setRemoteAuthenticated(false)
+            localProgressStore.clear()
+            setProgress(createInitialProgress())
+            setAccountNickname('')
+            setSyncStatus('닉네임을 입력하면 이 브라우저에서 자동 로그인됩니다.')
+            setSyncReady(true)
+            return
           }
 
-          setSyncStatus('외부 저장소와 동기화됩니다.')
+          setRemoteAuthenticated(true)
+          setAccountNickname(session.nickname)
+
+          if (session.progress) {
+            setProgress(
+              sanitizeProgress(
+                {
+                  ...session.progress,
+                  nickname: session.nickname,
+                  onboardingComplete: true,
+                },
+                courseCatalog,
+              ),
+            )
+          } else {
+            setProgress({
+              ...createInitialProgress(),
+              nickname: session.nickname,
+            })
+          }
+
+          setSyncStatus(`${session.nickname} 닉네임으로 자동 로그인되었습니다.`)
           setSyncReady(true)
         } catch {
           if (cancelled) return
+          setRemoteAuthenticated(false)
           setSyncMode('local')
           setSyncStatus('외부 저장소를 읽지 못해 이 브라우저에만 저장합니다.')
           setSyncReady(true)
@@ -209,6 +230,7 @@ function StudyApp({ content }: { content: ContentBundle }) {
       })
       .catch(() => {
         if (cancelled) return
+        setRemoteAuthenticated(false)
         setSyncMode('local')
         setSyncStatus('현재는 이 브라우저에만 저장됩니다.')
         setSyncReady(true)
@@ -224,7 +246,7 @@ function StudyApp({ content }: { content: ContentBundle }) {
   }, [progress])
 
   useEffect(() => {
-    if (!syncReady || syncMode !== 'remote' || !deviceToken || !progress.onboardingComplete) {
+    if (!syncReady || syncMode !== 'remote' || !remoteAuthenticated || !progress.onboardingComplete) {
       return
     }
 
@@ -233,7 +255,7 @@ function StudyApp({ content }: { content: ContentBundle }) {
     }
 
     saveTimerRef.current = window.setTimeout(() => {
-      saveRemoteProgress(deviceToken, progress.nickname, progress)
+      saveRemoteProgress(progress)
         .then(() => {
           setSyncStatus('외부 저장소와 동기화되었습니다.')
         })
@@ -248,7 +270,11 @@ function StudyApp({ content }: { content: ContentBundle }) {
         saveTimerRef.current = null
       }
     }
-  }, [deviceToken, progress, syncMode, syncReady])
+  }, [progress, remoteAuthenticated, syncMode, syncReady])
+
+  useEffect(() => {
+    setAccountNickname(progress.nickname)
+  }, [progress.nickname])
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'auto' })
@@ -429,7 +455,14 @@ function StudyApp({ content }: { content: ContentBundle }) {
   }
 
   const finishOnboarding = async (profile: ProgressState['learnerProfile'], nickname: string) => {
-    const safeNickname = nickname.trim() || '스터디 멤버'
+    const requestedNickname = nickname.trim()
+    const safeNickname = syncMode === 'remote' ? requestedNickname : requestedNickname || '스터디 멤버'
+
+    if (syncMode === 'remote' && !safeNickname) {
+      setSyncStatus('원격 저장을 쓰려면 닉네임을 먼저 입력해야 합니다.')
+      return
+    }
+
     const courseId = profile === 'fast-track' ? 'beginner' : 'starter'
     const firstLesson = lessonOrder.find((lesson) => lesson.courseId === courseId)
     const nextProgress: ProgressState = {
@@ -446,12 +479,12 @@ function StudyApp({ content }: { content: ContentBundle }) {
 
     if (syncMode === 'remote') {
       setSyncBusy(true)
-      setSyncStatus('외부 저장소 사용자 정보를 준비하는 중입니다.')
+      setSyncStatus('닉네임으로 로그인하는 중입니다.')
 
       try {
-        const session = await bootstrapRemoteProfile(safeNickname, deviceToken)
-        setStoredDeviceToken(session.deviceToken)
-        setDeviceToken(session.deviceToken)
+        const session = await loginRemoteProfile(safeNickname)
+        setRemoteAuthenticated(true)
+        setAccountNickname(session.nickname)
 
         const remoteProgress = session.progress
           ? sanitizeProgress(
@@ -459,7 +492,6 @@ function StudyApp({ content }: { content: ContentBundle }) {
                 ...nextProgress,
                 ...session.progress,
                 onboardingComplete: true,
-                learnerProfile: profile,
                 nickname: session.nickname || safeNickname,
                 selectedCourseId: session.progress.selectedCourseId ?? courseId,
                 settings: {
@@ -472,11 +504,10 @@ function StudyApp({ content }: { content: ContentBundle }) {
           : nextProgress
 
         setProgress(remoteProgress)
-        setSyncStatus('외부 저장소와 연결되었습니다.')
+        setSyncStatus(`${session.nickname} 닉네임으로 로그인되었습니다.`)
       } catch {
-        setProgress(nextProgress)
-        setSyncMode('local')
-        setSyncStatus('외부 연결에 실패해 이 브라우저에만 저장합니다.')
+        setSyncStatus('로그인에 실패했습니다. 닉네임을 확인하고 다시 시도해 주세요.')
+        return
       } finally {
         setSyncBusy(false)
       }
@@ -486,6 +517,80 @@ function StudyApp({ content }: { content: ContentBundle }) {
 
     if (firstLesson) setSelectedLessonId(firstLesson.id)
     setView('dashboard')
+  }
+
+  const switchRemoteNickname = async () => {
+    if (syncMode !== 'remote') {
+      return
+    }
+
+    const safeNickname = accountNickname.trim()
+    if (!safeNickname) {
+      setSyncStatus('로그인할 닉네임을 입력해 주세요.')
+      return
+    }
+
+    setSyncBusy(true)
+    setSyncStatus('다른 닉네임으로 로그인하는 중입니다.')
+
+    try {
+      const session = await loginRemoteProfile(safeNickname)
+      setRemoteAuthenticated(true)
+      setAccountNickname(session.nickname)
+
+      const nextProgress = session.progress
+        ? sanitizeProgress(
+            {
+              ...createInitialProgress(),
+              ...session.progress,
+              nickname: session.nickname,
+              onboardingComplete: Boolean(session.progress.onboardingComplete),
+            },
+            courseCatalog,
+          )
+        : {
+            ...createInitialProgress(),
+            nickname: session.nickname,
+          }
+
+      setProgress(nextProgress)
+
+      const firstLesson = lessonOrder.find((lesson) => lesson.courseId === nextProgress.selectedCourseId) ?? lessonOrder[0]
+      if (firstLesson) {
+        setSelectedLessonId(firstLesson.id)
+      }
+
+      setView('dashboard')
+      setSyncStatus(`${session.nickname} 닉네임으로 전환되었습니다.`)
+    } catch {
+      setSyncStatus('닉네임 전환에 실패했습니다. 잠시 후 다시 시도해 주세요.')
+    } finally {
+      setSyncBusy(false)
+    }
+  }
+
+  const logoutFromRemote = async () => {
+    if (syncMode !== 'remote') {
+      return
+    }
+
+    setSyncBusy(true)
+    setSyncStatus('현재 로그인 세션을 종료하는 중입니다.')
+
+    try {
+      await logoutRemoteProfile()
+      setRemoteAuthenticated(false)
+      localProgressStore.clear()
+      setProgress(createInitialProgress())
+      setAccountNickname('')
+      setSelectedLessonId(lessonOrder[0]?.id ?? '')
+      setView('dashboard')
+      setSyncStatus('로그아웃되었습니다. 다른 닉네임으로 다시 시작할 수 있습니다.')
+    } catch {
+      setSyncStatus('로그아웃에 실패했습니다. 잠시 후 다시 시도해 주세요.')
+    } finally {
+      setSyncBusy(false)
+    }
   }
 
   if (!syncReady) {
@@ -502,7 +607,16 @@ function StudyApp({ content }: { content: ContentBundle }) {
 
   return (
     <div className={`app-shell app-view-${view}`}>
-      {!progress.onboardingComplete ? <WelcomeOverlay onFinish={finishOnboarding} busy={syncBusy} syncStatus={syncStatus} /> : null}
+      {!progress.onboardingComplete ? (
+        <WelcomeOverlay
+          key={`${syncMode}-${progress.nickname || 'guest'}`}
+          onFinish={finishOnboarding}
+          busy={syncBusy}
+          syncStatus={syncStatus}
+          nicknameRequired={syncMode === 'remote'}
+          initialNickname={progress.nickname}
+        />
+      ) : null}
       <aside className="sidebar">
         <div className="brand-block">
           <div className="brand-mark">JP</div>
@@ -1071,6 +1185,49 @@ function StudyApp({ content }: { content: ContentBundle }) {
             <section className="section-card">
               <div className="section-header">
                 <div>
+                  <p className="eyebrow">학습 계정</p>
+                  <h3>닉네임으로 이어서 공부합니다</h3>
+                </div>
+                <span className="section-hint">{syncMode === 'remote' ? '세션 로그인 사용 중' : '로컬 저장만 사용 중'}</span>
+              </div>
+              <div className="settings-grid">
+                <div className="info-pill">
+                  <strong>현재 상태</strong>
+                  <p>{syncMode === 'remote' ? (remoteAuthenticated ? `${progress.nickname || '스터디 멤버'} 닉네임으로 로그인됨` : '아직 로그인하지 않았습니다.') : '현재는 이 브라우저에만 저장됩니다.'}</p>
+                  <p>{syncStatus}</p>
+                </div>
+                {syncMode === 'remote' ? (
+                  <div className="info-pill">
+                    <strong>다른 닉네임으로 전환</strong>
+                    <p>같은 닉네임으로 들어가면 기존 학습 기록을 그대로 이어받습니다.</p>
+                    <div className="stack-md">
+                      <input
+                        className="text-input"
+                        value={accountNickname}
+                        onChange={(event) => setAccountNickname(event.target.value)}
+                        placeholder="예: 민수"
+                      />
+                      <div className="inline-actions">
+                        <button className="primary-button" type="button" onClick={() => void switchRemoteNickname()} disabled={syncBusy}>
+                          {syncBusy ? '처리 중...' : '이 닉네임으로 로그인'}
+                        </button>
+                        <button className="ghost-button" type="button" onClick={() => void logoutFromRemote()} disabled={syncBusy || !remoteAuthenticated}>
+                          로그아웃
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="info-pill">
+                    <strong>원격 저장 안내</strong>
+                    <p>Vercel 환경 변수에 `DATABASE_URL`을 넣고 재배포하면 닉네임 기반 로그인과 기기 간 동기화가 켜집니다.</p>
+                  </div>
+                )}
+              </div>
+            </section>
+            <section className="section-card">
+              <div className="section-header">
+                <div>
                   <p className="eyebrow">학습 설정</p>
                   <h3>보기와 백업 설정</h3>
                 </div>
@@ -1127,7 +1284,7 @@ function StudyApp({ content }: { content: ContentBundle }) {
               <div className="support-actions">
                 <div className="support-note">
                   <strong>저장 위치</strong>
-                  <p>{syncMode === 'remote' ? '외부 저장소와 함께 동기화됩니다.' : '현재 브라우저에만 저장됩니다.'}</p>
+                  <p>{syncMode === 'remote' ? '닉네임 세션으로 로그인되어 외부 저장소와 동기화됩니다.' : '현재 브라우저에만 저장됩니다.'}</p>
                   <p>{syncStatus}</p>
                 </div>
                 <div className="support-note">
@@ -1156,8 +1313,8 @@ function StudyApp({ content }: { content: ContentBundle }) {
                           localProgressStore.clear()
                           setProgress(resetProgress)
 
-                          if (syncMode === 'remote' && deviceToken) {
-                            void saveRemoteProgress(deviceToken, progress.nickname || '스터디 멤버', resetProgress)
+                          if (syncMode === 'remote' && remoteAuthenticated) {
+                            void saveRemoteProgress(resetProgress)
                               .then(() => {
                                 setSyncStatus('외부 저장소의 진행도도 초기화했습니다.')
                               })
@@ -1753,24 +1910,31 @@ function WelcomeOverlay({
   onFinish,
   busy,
   syncStatus,
+  nicknameRequired,
+  initialNickname,
 }: {
   onFinish: (profile: ProgressState['learnerProfile'], nickname: string) => void | Promise<void>
   busy: boolean
   syncStatus: string
+  nicknameRequired: boolean
+  initialNickname?: string
 }) {
   const [profile, setProfile] = useState<ProgressState['learnerProfile']>('starter')
-  const [nickname, setNickname] = useState('')
+  const [nickname, setNickname] = useState(initialNickname ?? '')
+
+  const startDisabled = busy || (nicknameRequired && !nickname.trim())
+
   return (
     <div className="welcome-overlay">
       <div className="welcome-modal">
         <div>
           <p className="eyebrow">처음 시작하기</p>
-          <h2>입문자 흐름으로 바로 시작합니다</h2>
-          <p className="muted-copy">완전 입문자라면 그대로 시작하는 편이 가장 안전합니다. 이미 배웠다면 아래에서만 바꿉니다.</p>
+          <h2>{nicknameRequired ? '닉네임으로 로그인하고 시작합니다' : '입문자 흐름으로 바로 시작합니다'}</h2>
+          <p className="muted-copy">{nicknameRequired ? '같은 닉네임으로 접속하면 이전 학습 기록을 그대로 이어서 볼 수 있습니다.' : '완전 입문자라면 그대로 시작하는 편이 가장 안전합니다. 이미 배웠다면 아래에서만 바꿉니다.'}</p>
         </div>
         <p className="muted-copy">{syncStatus}</p>
-        <button className="primary-button" type="button" onClick={() => void onFinish(profile, nickname.trim())} disabled={busy}>
-          {busy ? '시작 준비 중...' : '이 흐름으로 시작합니다'}
+        <button className="primary-button" type="button" onClick={() => void onFinish(profile, nickname.trim())} disabled={startDisabled}>
+          {busy ? '시작 준비 중...' : nicknameRequired ? '이 닉네임으로 시작합니다' : '이 흐름으로 시작합니다'}
         </button>
         <details className="collapsible-card">
           <summary className="collapsible-summary"><div><p className="eyebrow">다른 시작 방식</p><h3>이미 배웠다면 여기서만 바꿉니다</h3></div><span className="section-hint">선택 사항</span></summary>
@@ -1781,10 +1945,10 @@ function WelcomeOverlay({
               <ProfileCard title="빠른 진도" description="이미 경험이 있어 빨리 살펴보기" active={profile === 'fast-track'} onClick={() => setProfile('fast-track')} />
             </div>
             <label>
-              <span className="field-label">닉네임 (선택)</span>
-              <input className="text-input" value={nickname} onChange={(event) => setNickname(event.target.value)} placeholder="예: 민수 / 비워두면 스터디 멤버" />
+              <span className="field-label">닉네임 {nicknameRequired ? '(필수)' : '(선택)'}</span>
+              <input className="text-input" value={nickname} onChange={(event) => setNickname(event.target.value)} placeholder={nicknameRequired ? '예: 민수' : '예: 민수 / 비워두면 스터디 멤버'} />
             </label>
-            <button className="primary-button" type="button" onClick={() => void onFinish(profile, nickname.trim())} disabled={busy}>
+            <button className="primary-button" type="button" onClick={() => void onFinish(profile, nickname.trim())} disabled={startDisabled}>
               {busy ? '저장소 연결 중...' : '선택한 방식으로 시작합니다'}
             </button>
           </div>
