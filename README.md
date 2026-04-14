@@ -43,6 +43,10 @@ npm run content:bootstrap
 npm run build
 ```
 
+## Operations
+
+- DB / session safety guide: [`docs/db-session-safety.md`](./docs/db-session-safety.md)
+
 ## Oracle VM Server
 
 ```bash
